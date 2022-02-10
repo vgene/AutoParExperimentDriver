@@ -24,6 +24,7 @@ def parseExp(lines, bmark):
     anchor_loop_info = -1
     anchor_loop_speedup = -1
     anchor_loop_selection = -1
+    anchor_compatible_map = -1
     for idx, line in enumerate(lines):
         if "Focus on these loops" in line:
             anchor_loop_info = idx
@@ -31,6 +32,8 @@ def parseExp(lines, bmark):
             anchor_loop_speedup = idx
         if "Total expected speedup" in line:
             anchor_loop_selection = idx
+        if line.startswith("Compatible Map"):
+            anchor_compatible_map = idx
 
     if anchor_loop_info < 0 or anchor_loop_speedup < 0 or anchor_loop_selection < 0:
         print("Warning: %s Unexpected dump; cannot find all anchors" % bmark)
@@ -55,6 +58,7 @@ def parseExp(lines, bmark):
     loop_info_nodebug_re = re.compile(
         r' - (.+).*Time ([0-9]+) / ([0-9]+) Coverage: ([0-9\.]+)%')
 
+    loop_order = []
     for line in lines[anchor_loop_info + 1:]:
         if line.startswith(" - "):
             loop_info_re_parsed = loop_info_re.findall(line)
@@ -70,6 +74,7 @@ def parseExp(lines, bmark):
                 loop_name, exec_time, total_time, exec_coverage = loop_info_re_parsed[0]
                 debug_info = ""
 
+            loop_order.append(loop_name.strip())
             loops[loop_name.strip()] = {
                 "debug_info": debug_info, "exec_time": int(exec_time),
                 "total_time": int(total_time), "exec_coverage": float(exec_coverage)
@@ -114,10 +119,13 @@ def parseExp(lines, bmark):
     speedup_re_parsed = speedup_re.findall(lines[anchor_loop_selection])
     if not speedup_re_parsed:
         print("Warning: %s Unexpected dump; cannot parse total speedup" % bmark)
-        return None
-    speedup, worker_cnt = speedup_re_parsed[0]
-    speedup = float(speedup)
-    worker_cnt = int(worker_cnt)
+        # return None #FIXME
+        speedup = 1.0
+        worker_cnt = 0
+    else:
+        speedup, worker_cnt = speedup_re_parsed[0]
+        speedup = float(speedup)
+        worker_cnt = int(worker_cnt)
 
     # Find Selection
     # - 87.95% depth 3    MAIN__ :: for.cond33    DSWP[P22]          #regrn-par-loop
@@ -137,6 +145,16 @@ def parseExp(lines, bmark):
                 return None
             else:
                 loops[loop_name.strip()].update({"selected": selected})
+
+    compatible_pairs = []
+    if anchor_compatible_map != -1:
+        for line in lines[anchor_compatible_map + 1:]:
+            if line.startswith("End of"):
+                break
+            try:
+                compatible_pairs.append([int(i.strip()) for i in line.split(" ")])
+            except Exception as e:
+                print(e)
 
     # Find coverage
     total_coverage = 0.0
@@ -220,6 +238,10 @@ def parseExp(lines, bmark):
         num_reg_lcdep = -1
         num_control_lcdep = -1
 
+        largestSeqScc = -1
+        parallelScc = -1
+        seqScc = -1
+
         # remedies_start_offset = -1
         for idx, line in enumerate(lines[anchor + 1:]):
             if line.startswith("Total memory dependence queries to CAF"):
@@ -246,6 +268,25 @@ def parseExp(lines, bmark):
                 res = [int(i) for i in line.split() if i.isdigit()]
                 if len(res) == 1:
                     num_control_lcdep = res[0]
+            elif line.startswith("Largest Seq SCC"):
+                try:
+                    largestSeqScc = float(line.split(" ")[-1])
+                except Exception as e:
+                    print(e)
+                    print("Warning: cannot convert largest seq scc to float")
+            elif line.startswith("Parallel SCC"):
+                try:
+                    parallelScc = float(line.split(" ")[-1])
+                except Exception as e:
+                    print(e)
+                    print("Warning: cannot convert parallel scc to float")
+            elif line.startswith("Sequential SCC"):
+                try:
+                    seqScc = float(line.split(" ")[-1])
+                except Exception as e:
+                    print(e)
+                    print("Warning: cannot convert sequential scc to float")
+
             # elif line.startswith("Selected Remedies"):
             #     remedies_start_offset = idx + 1
             elif line.startswith("Compute weight for loop"):
@@ -387,12 +428,15 @@ def parseExp(lines, bmark):
             "num_reg_lcdep": num_reg_lcdep,
             "num_control_lcdep": num_control_lcdep,
             "chosen_count": chosen_dict,
-            "avail_count": avail_dict
+            "avail_count": avail_dict,
+            "largest_seq_scc": largestSeqScc,
+            "parallel_scc": parallelScc,
+            "sequential_scc": seqScc
         }
         loops[loop_name]["dependence_info"] = final_dict
 
     return {"speedup": speedup, "worker_cnt": worker_cnt, "total_coverage": total_coverage,
-            "loops": loops}
+            "loops": loops, "compatible_map": compatible_pairs, "loop_order": loop_order}
 
 
 # Generate a JSON file to show the result

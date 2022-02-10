@@ -322,6 +322,16 @@ def get_all_passes(root_path, bmark, passes, result_path):
         status["HeaderPhi"] = get_one_prof(root_path, bmark, 'HeaderPhi Profile', "benchmark.headerphi_prof.out")
     if "Experiment" in passes:
         status["Experiment"] = get_exp_result(root_path, bmark, result_path)
+    if "SlampDump" in passes:
+        if 'Edge' in status and status['Edge'] and "SLAMP" in status and status['SLAMP']:
+            status["Exp-slamp"] = get_exp_result(root_path, bmark, result_path, "slamp.dump")
+        else:
+            status["Exp-slamp"] = None
+    if "IgnoreFnDump" in passes:
+        if 'Edge' in status and status['Edge']:
+            status["Exp-ignorefn"] = get_exp_result(root_path, bmark, result_path, "ignorefn.dump")
+        else:
+            status["Exp-ignorefn"] = None
     if "Exp-3" in passes:
         # status["Experiment-no-spec"] = get_exp_result(root_path, bmark, result_path, "no-spec.dump")
 
@@ -524,7 +534,7 @@ if __name__ == "__main__":
     #passes = ["Edge", "Loop", "LAMP", "SpecPriv", "PDG"] # "Experiment"]
     #passes = ["Edge", "Loop", "LAMP", "SpecPriv", "Experiment"]
     #passes = ["Edge", "Loop", "LAMP", "SpecPriv", "Exp-3"]
-    passes = ["Edge", "Loop", "SLAMP"]
+    passes = ["Edge", "Loop", "SLAMP", "SlampDump", "IgnoreFnDump"]
     #  passes = ["Inline"]
     # passes = ["Edge", "Loop", "LAMP", "SpecPriv", "Exp-3"]
     # passes = ["Edge", "Loop", "LAMP", "SpecPriv", "Experiment", "RealSpeedup"]
