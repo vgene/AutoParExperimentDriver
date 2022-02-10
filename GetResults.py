@@ -27,6 +27,9 @@ from ReportVisualizer import ReportVisualizer
 from ResultParser import parseExp
 
 
+def printAndFlush(content):
+    print(content, flush=True)
+
 def clean_all_bmarks(root_path, bmark_list, reg_option):
     # 0: remake all
     # 1: use profiling
@@ -53,14 +56,14 @@ def clean_all_bmarks(root_path, bmark_list, reg_option):
                                         stdout=subprocess.DEVNULL,
                                         stderr=subprocess.STDOUT)
         if make_process.wait() != 0:
-            print(colored("Clean failed for %s" % bmark, 'red'))
+            printAndFlush(colored("Clean failed for %s" % bmark, 'red'))
 
-    print("Finish cleaning")
+    printAndFlush("Finish cleaning")
     return 0
 
 
 def get_one_prof(root_path, bmark, profile_name, profile_recipe):
-    print("Generating %s on %s " % (profile_name, bmark))
+    printAndFlush("Generating %s on %s " % (profile_name, bmark)) 
 
     os.chdir(os.path.join(root_path, bmark, "src"))
     start_time = time.time()
@@ -71,16 +74,16 @@ def get_one_prof(root_path, bmark, profile_name, profile_recipe):
 
     if make_process.wait() != 0:
         elapsed = time.time() - start_time
-        print(colored("%s failed for %s , took %.4fs" % (profile_name, bmark, elapsed), 'red'))
+        printAndFlush(colored("%s failed for %s, took %.4fs" % (profile_name, bmark, elapsed), 'red'))
         return False
     else:
         elapsed = time.time() - start_time
-        print(colored("%s succeeded for %s, took %.4fs" % (profile_name, bmark, elapsed), 'green'))
+        printAndFlush(colored("%s succeeded for %s, took %.4fs" % (profile_name, bmark, elapsed), 'green'))
         return True
 
 
 def get_pdg(root_path, bmark, result_path):
-    print("Generating PDG results on %s " % (bmark))
+    printAndFlush("Generating PDG results on %s " % (bmark))
     os.chdir(os.path.join(root_path, bmark, "src"))
 
     exp_name = "/u/ziyangx/SCAF/scripts/genPDG.sh"
@@ -91,25 +94,25 @@ def get_pdg(root_path, bmark, result_path):
 
     enables = ""
     if not os.path.isfile("benchmark.loopProf.out"):
-        print(colored("No LoopProf for %s, abort" % bmark, 'red'))
+        printAndFlush(colored("No LoopProf for %s, abort" % bmark, 'red'))
         return False
     else:
         shutil.copy("benchmark.loopProf.out", "loopProf.out")
 
     if not os.path.isfile("benchmark.lamp.out"):
-        print(colored("No LAMP for %s!" % bmark, 'red'))
+        printAndFlush(colored("No LAMP for %s!" % bmark, 'red'))
     else:
         shutil.copy("benchmark.lamp.out", "result.lamp.profile")
         enables += "-enable-lamp "
 
     if not os.path.isfile("benchmark.edgeProf.out"):
-        print(colored("No EdgeProf for %s" % bmark, 'red'))
+        printAndFlush(colored("No EdgeProf for %s" % bmark, 'red'))
     else:
         shutil.copy("benchmark.edgeProf.out", "llvmprof.out")
         enables += "-enable-edgeprof "
 
     if not os.path.isfile("benchmark.specpriv-profile.out"):
-        print(colored("No SpecPriv for %s" % bmark, 'red'))
+        printAndFlush(colored("No SpecPriv for %s" % bmark, 'red'))
     else:
         shutil.copy("benchmark.specpriv-profile.out", "result.specpriv.profile.txt")
         enables += "-enable-specpriv "
@@ -122,18 +125,18 @@ def get_pdg(root_path, bmark, result_path):
 
     if make_process.wait() != 0:
         elapsed = time.time() - start_time
-        print(colored("PDG generation failed for %s, took %.4fs" % (bmark, elapsed), 'red'))
+        printAndFlush(colored("PDG generation failed for %s, took %.4fs" % (bmark, elapsed), 'red'))
         return False
     else:
         elapsed = time.time() - start_time
-        print(colored("PDG genration succeeded for %s, took %.4fs" % (bmark, elapsed), 'green'))
+        printAndFlush(colored("PDG genration succeeded for %s, took %.4fs" % (bmark, elapsed), 'green'))
         return True
     
 
 # ZY - check whether all profilings are there;
 # if remake_profile == True, ignore remake them by the Makefile, else abort
 def get_exp_result(root_path, bmark, result_path, exp_name="benchmark.collaborative-pipeline.dump"):
-    print("Generating " + exp_name +  " on %s " % (bmark))
+    printAndFlush("Generating " + exp_name +  " on %s " % (bmark))
 
     os.chdir(os.path.join(root_path, bmark, "src"))
 
@@ -144,7 +147,7 @@ def get_exp_result(root_path, bmark, result_path, exp_name="benchmark.collaborat
 
     if make_process.wait() != 0:
         elapsed = time.time() - start_time
-        print(colored("Experiment failed for %s, took %.4fs" % (bmark, elapsed), 'red'))
+        printAndFlush(colored("Experiment failed for %s, took %.4fs" % (bmark, elapsed), 'red'))
         return None
     else:
         elapsed = time.time() - start_time
@@ -157,12 +160,12 @@ def get_exp_result(root_path, bmark, result_path, exp_name="benchmark.collaborat
         # Create a backup
         shutil.copy(exp_name, os.path.join(result_path, bmark + "." + exp_name))
 
-        print(colored(exp_name + " succeeded for %s, took %.4fs" % (bmark, elapsed), 'green'))
+        printAndFlush(colored(exp_name + " succeeded for %s, took %.4fs" % (bmark, elapsed), 'green'))
         return parsed_result
 
 
 def get_seq_time(root_path, bmark, times):
-    print("Try to get sequential execution time (repeated %d times)" % times)
+    printAndFlush("Try to get sequential execution time (repeated %d times)" % times)
     os.chdir(os.path.join(root_path, bmark, "src"))
     exp_name = "reg_seq"
     seq_time_name = "seq.time"
@@ -174,7 +177,7 @@ def get_seq_time(root_path, bmark, times):
                                         stderr=subprocess.STDOUT)
 
         if make_process.wait() != 0 and os.path.exists(seq_time_name):
-            print(colored("Sequential time failed for %s" % bmark, 'red'))
+            printAndFlush(colored("Sequential time failed for %s" % bmark, 'red'))
             return False
         else:
             with open(seq_time_name, 'r') as fd:
@@ -182,19 +185,19 @@ def get_seq_time(root_path, bmark, times):
 
             try:
                 time_list.append(float(line))
-                print("NO. %d: %.2fs" % (run_time, float(line)))
+                printAndFlush("NO. %d: %.2fs" % (run_time, float(line)))
             except ValueError:
                 return False
             os.remove(seq_time_name)
-    print(colored("Sequential time measurement succeeded for %s!" % bmark, 'green'))
-    print(time_list)
+    printAndFlush(colored("Sequential time measurement succeeded for %s!" % bmark, 'green'))
+    printAndFlush(time_list)
 
 
     return time_list, sum(time_list) / times
 
 
 def get_para_time(root_path, bmark, times, num_workers=28):
-    print("Try to get parallel execution time, running times is %d, test workers is %d" % (times, num_workers))
+    printAndFlush("Try to get parallel execution time, running times is %d, test workers is %d" % (times, num_workers))
     os.chdir(os.path.join(root_path, bmark, "src"))
     exp_name = "reg_para"
     para_time_name = "parallel.time"
@@ -206,7 +209,7 @@ def get_para_time(root_path, bmark, times, num_workers=28):
                                         stderr=subprocess.STDOUT)
 
         if make_process.wait() != 0 and os.path.exists(para_time_name):
-            print(colored("Parallel time failed for %s" % bmark, 'red'))
+            printAndFlush(colored("Parallel time failed for %s" % bmark, 'red'))
             return False
         else:
             with open(para_time_name, 'r') as fd:
@@ -214,19 +217,19 @@ def get_para_time(root_path, bmark, times, num_workers=28):
 
             try:
                 time_list.append(float(line))
-                print("NO. %d: %.2fs" % (run_time, float(line)))
+                printAndFlush("NO. %d: %.2fs" % (run_time, float(line)))
             except ValueError:
                 return False
 
             os.remove(para_time_name)
-    print(colored("Parallel time measurement succeeded for %s!" % bmark, 'green'))
-    print(time_list)
+    printAndFlush(colored("Parallel time measurement succeeded for %s!" % bmark, 'green'))
+    printAndFlush(time_list)
 
     return time_list, sum(time_list) / times
 
 
 def get_real_speedup(root_path, bmark, reg_option, times=3, default_num_worker=28):
-    print("Generating real speedup for %s " % (bmark))
+    printAndFlush("Generating real speedup for %s " % (bmark))
     os.chdir(os.path.join(root_path, bmark, "src"))
 
     num_workers_plan_list = list(range(1, 29))  # [1,28]
@@ -243,17 +246,17 @@ def get_real_speedup(root_path, bmark, reg_option, times=3, default_num_worker=2
                                         stderr=subprocess.STDOUT)
         if make_process.wait() != 0:
             elapsed = time.time() - start_time
-            print(colored("Real speedup experiment failed for %s, took %.4fs" % (bmark, elapsed), 'red'))
+            printAndFlush(colored("Real speedup experiment failed for %s, took %.4fs" % (bmark, elapsed), 'red'))
             return None
         else:
             elapsed = time.time() - start_time
 
         if os.path.exists(exp_name) and os.stat(exp_name).st_size == 0:
-            print(colored("Hooyah! Same output from sequential and parallel versions for %s! Took %.4fs" % (bmark, elapsed), 'green'))
+            printAndFlush(colored("Hooyah! Same output from sequential and parallel versions for %s! Took %.4fs" % (bmark, elapsed), 'green'))
         else:
-            print(colored("Oh snap! Seems like results disagree for %s! Took %.4fs" % (bmark, elapsed), 'red'))
+            printAndFlush(colored("Oh snap! Seems like results disagree for %s! Took %.4fs" % (bmark, elapsed), 'red'))
             if bmark in no_check_list:
-                print(colored("%s is in the no checking list! Continue to get results" % (bmark), 'green'))
+                printAndFlush(colored("%s is in the no checking list! Continue to get results" % (bmark), 'green'))
             else:
                 return None
 
@@ -268,7 +271,7 @@ def get_real_speedup(root_path, bmark, reg_option, times=3, default_num_worker=2
             real_speedup['para_time_list_dict'] = {default_num_worker: seq_time_list}
             real_speedup['speedup'] = round(speedup, 2)
         else:
-            print(colored("Oh snap! Getting execution time failed for %s!" % (bmark), 'green'))
+            printAndFlush(colored("Oh snap! Getting execution time failed for %s!" % (bmark), 'green'))
             return None
 
     # Sequential time only
@@ -278,7 +281,7 @@ def get_real_speedup(root_path, bmark, reg_option, times=3, default_num_worker=2
             real_speedup['seq_time'] = round(seq_time, 3)
             real_speedup['seq_time_list'] = seq_time_list
         else:
-            print(colored("Oh snap! Getting execution time failed for %s!" % (bmark), 'green'))
+            printAndFlush(colored("Oh snap! Getting execution time failed for %s!" % (bmark), 'green'))
             return None
 
     # Parallel time only
@@ -289,13 +292,13 @@ def get_real_speedup(root_path, bmark, reg_option, times=3, default_num_worker=2
             para_time_list, para_time = get_para_time(root_path, bmark, times, num_workers=num_workers)
             speed_up_dict[num_workers] = round(para_time, 3)
             para_time_list_dict[num_workers] = para_time_list
-            print("%s %.3f on %d workers" % (bmark, para_time, num_workers))
+            printAndFlush("%s %.3f on %d workers" % (bmark, para_time, num_workers))
         if para_time and para_time > 0:
             real_speedup['para_time'] = round(para_time, 3)
             real_speedup['para_time_dict'] = speed_up_dict
             real_speedup['para_time_list_dict'] = para_time_list_dict
         else:
-            print(colored("Oh snap! Getting execution time failed for %s!" % (bmark), 'green'))
+            printAndFlush(colored("Oh snap! Getting execution time failed for %s!" % (bmark), 'green'))
             return None
 
     return real_speedup
