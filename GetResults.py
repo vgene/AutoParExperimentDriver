@@ -382,6 +382,8 @@ def parse_args():
     parser.add_argument("-f", "--force-die", action='store_true', help="Regression option (0-5), will bypass interaction")
     parser.add_argument("-n", "--core-num", type=int,
                         default=4, help="Core number")
+    parser.add_argument("-m", "--memo", type=str,
+                        default="", help="A short description of the run")
     parser.add_argument("-t", "--test-times", type=int,
                         default=3, help="Test times for sequential and parallel version")
 
@@ -404,6 +406,8 @@ def parse_args():
     config['bmark_list'] = bmark_list
     config['reg_option'] = args.reg_option
     config['force_die'] = args.force_die
+    config['memo'] = args.memo
+
 
     # Get CPF and Regression Git Hash
     if 'LIBERTY_LIBS_DIR' in os.environ and 'LIBERTY_SMTX_DIR' in os.environ:
