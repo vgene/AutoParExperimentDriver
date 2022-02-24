@@ -34,6 +34,9 @@ def parseExp(lines, bmark):
             anchor_loop_selection = idx
         if line.startswith("Compatible Map"):
             anchor_compatible_map = idx
+        if "Error: sid mismatch" in line:
+            print("Warning: %s sid mismatch, abort" % bmark)
+            return None
 
     if anchor_loop_info < 0 or anchor_loop_speedup < 0 or anchor_loop_selection < 0:
         print("Warning: %s Unexpected dump; cannot find all anchors" % bmark)
