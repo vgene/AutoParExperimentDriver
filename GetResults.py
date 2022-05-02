@@ -316,6 +316,14 @@ def get_all_passes(root_path, bmark, passes, result_path):
         status["LAMP"] = get_one_prof(root_path, bmark, 'LAMP', "benchmark.lamp.out")
     if "SLAMP" in passes:
         status["SLAMP"] = get_one_prof(root_path, bmark, 'SLAMP', "benchmark.result.slamp.profile")
+    if "Profile-Seq" in passes:
+        status["Profile-Seq"] = get_one_prof(root_path, bmark, 'Profile-Seq', "profile-seq.time")
+    if "Asan" in passes:
+        status["Asan"] = get_one_prof(root_path, bmark, 'Asan', "asan.time")
+    if "Msan" in passes:
+        status["Msan"] = get_one_prof(root_path, bmark, 'Msan', "msan.time")
+    if "Measure" in passes:
+        status["Measure"] = get_one_prof(root_path, bmark, 'measure', "benchmark.slamp.measure.txt")
     if "SpecPriv" in passes:
         status["SpecPriv"] = get_one_prof(root_path, bmark, 'SpecPriv Profile', "benchmark.specpriv-profile.out")
     if "HeaderPhi" in passes:
@@ -538,7 +546,10 @@ if __name__ == "__main__":
     #passes = ["Edge", "Loop", "LAMP", "SpecPriv", "PDG"] # "Experiment"]
     #passes = ["Edge", "Loop", "LAMP", "SpecPriv", "Experiment"]
     #passes = ["Edge", "Loop", "LAMP", "SpecPriv", "Exp-3"]
-    passes = ["Edge", "Loop", "SLAMP", "Exp-slamp", "Exp-ignorefn"]
+    #passes = ["Edge", "Loop", "SLAMP"] #"SLAMP", "Exp-slamp", "Exp-ignorefn"]
+    #passes = ["Profile-Seq"] #"SLAMP", "Exp-slamp", "Exp-ignorefn"]
+    #  passes = ["Msan", "Asan"]#, "Exp-slamp", "Exp-ignorefn"]
+    passes = ["SLAMP"]#, "Exp-slamp", "Exp-ignorefn"]
     #  passes = ["Inline"]
     # passes = ["Edge", "Loop", "LAMP", "SpecPriv", "Exp-3"]
     # passes = ["Edge", "Loop", "LAMP", "SpecPriv", "Experiment", "RealSpeedup"]
