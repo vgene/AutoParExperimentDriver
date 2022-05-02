@@ -25,6 +25,7 @@ import git
 
 from ReportVisualizer import ReportVisualizer
 from ResultParser import parseExp
+import SLAMP
 
 
 def printAndFlush(content):
@@ -61,16 +62,15 @@ def clean_all_bmarks(root_path, bmark_list, reg_option):
     printAndFlush("Finish cleaning")
     return 0
 
-
 def get_one_prof(root_path, bmark, profile_name, profile_recipe):
     printAndFlush("Generating %s on %s " % (profile_name, bmark)) 
 
     os.chdir(os.path.join(root_path, bmark, "src"))
     start_time = time.time()
     with open(profile_name.replace(' ', '-')+".log", "w") as fd:
-        make_process = subprocess.Popen(["make", profile_recipe],
-                                        stdout=fd,
-                                        stderr=fd)
+      make_process = subprocess.Popen(["make", profile_recipe],
+                                      stdout=fd,
+                                      stderr=fd)
 
     if make_process.wait() != 0:
         elapsed = time.time() - start_time
@@ -293,6 +293,7 @@ def get_real_speedup(root_path, bmark, reg_option, times=3, default_num_worker=2
             speed_up_dict[num_workers] = round(para_time, 3)
             para_time_list_dict[num_workers] = para_time_list
             printAndFlush("%s %.3f on %d workers" % (bmark, para_time, num_workers))
+        # Get the last speedup with 28 workers
         if para_time and para_time > 0:
             real_speedup['para_time'] = round(para_time, 3)
             real_speedup['para_time_dict'] = speed_up_dict
@@ -304,7 +305,7 @@ def get_real_speedup(root_path, bmark, reg_option, times=3, default_num_worker=2
     return real_speedup
 
 
-def get_all_passes(root_path, bmark, passes, result_path):
+def get_all_passes(root_path, bmark, passes, result_path, modules=None, extra_flags=None):
     status = {}
     if "Inline" in passes:
       status["Inline"] = get_one_prof(root_path, bmark, 'Inline', "benchmark.inlined.o3.out")
@@ -315,7 +316,8 @@ def get_all_passes(root_path, bmark, passes, result_path):
     if "LAMP" in passes:
         status["LAMP"] = get_one_prof(root_path, bmark, 'LAMP', "benchmark.lamp.out")
     if "SLAMP" in passes:
-        status["SLAMP"] = get_one_prof(root_path, bmark, 'SLAMP', "benchmark.result.slamp.profile")
+        status["SLAMP"] = SLAMP.run_SLAMP(root_path, bmark, modules, extra_flags)
+        SLAMP.parse_SLAMP_output(root_path, bmark, result_path, modules)
     if "Profile-Seq" in passes:
         status["Profile-Seq"] = get_one_prof(root_path, bmark, 'Profile-Seq', "profile-seq.time")
     if "Asan" in passes:
@@ -378,22 +380,36 @@ def get_benchmark_list_from_suite(suite, bmark_list):
         suite_list = [k for k, v in bmark_list.items() if suite in v["suites"] and v["available"]]
     return suite_list
 
-
+#TODO: ask for inputs that were not provided instead of terminating
+#allow setting of result path
 def parse_args():
+    keys = ["root_path", "bmark_list", "core_num", "test_times", "reg_option", "force_die", "passes", "modules", "extra_flags", "suite"]
+    nondefault_keys = ["root_path", "bmark_list", "reg_option", 
+        "passes", "extra_flags", "suite"]
+    default_keys = {"core_num":4, "test_times":3, "force_die":True}
+
     parser = argparse.ArgumentParser()
-    parser.add_argument("-p", "--root-path", type=str, required=True,
+    parser.add_argument("-p", "--root-path", type=str,
                         help="Root path of CPF benchmark directory")
     parser.add_argument("-b", "--bmark-list", type=str,
-                        required=True, help="Path to a benchmark json file")
+                         help="Path to a benchmark json file")
     parser.add_argument("-r", "--reg-option", type=int,
                         required=False, help="Regression option (0-5), will bypass interaction")
-    parser.add_argument("-f", "--force-die", action='store_true', help="Regression option (0-5), will bypass interaction")
-    parser.add_argument("-n", "--core-num", type=int,
-                        default=4, help="Core number")
-    parser.add_argument("-m", "--memo", type=str,
-                        default="", help="A short description of the run")
+    #  parser.add_argument("-f", "--force-die", action='store_true', help="Regression option (0-5), will bypass interaction")
+    #  parser.add_argument("-n", "--core-num", type=int,
+    #                      default=4, help="Core number")
+    #  parser.add_argument("-m", "--memo", type=str,
+    #                      default="", help="A short description of the run")
+    parser.add_argument("-f", "--force-die", #action='store_true',
+                        help="Regression option (0-5), will bypass interaction")
+    parser.add_argument("-n", "--core-num", type=int, #default=4, 
+                        help="Core number")
     parser.add_argument("-t", "--test-times", type=int,
-                        default=3, help="Test times for sequential and parallel version")
+                        #default=3, 
+                        help="Test times for sequential and parallel version")
+    parser.add_argument("-m", "--modules", type=str, nargs='*')
+    parser.add_argument("-q", "--passes", type=str, nargs='*')
+    parser.add_argument("-e", "--extra_flags", type=str, nargs='*')
 
     parser.add_argument("-s", "--suite", type=str, choices=[
         'All', 'reg_fast', 'reg_all', 'Spec', 'SpecFP', 'SpecInt',
@@ -401,21 +417,48 @@ def parse_args():
         'MiBench', 'Trimaran', 'Utilities', 'MicroBench'],
         help="Choose specific test suite")
 
-    args = parser.parse_args()
-    assert args.suite, "No suite specify"
-    with open(args.bmark_list, 'r') as fd:
-        bmark_list = json.load(fd)
-    bmark_list = get_benchmark_list_from_suite(args.suite, bmark_list)
+    parser.add_argument("-c", "--config_file", type=str,
+                        help="config file")
 
+    args = parser.parse_args()
+
+    # By default use command line argument
     config = {}
     config['root_path'] = args.root_path
     config['core_num'] = args.core_num
+    config['bmark_list'] = args.bmark_list
     config['test_times'] = args.test_times
-    config['bmark_list'] = bmark_list
     config['reg_option'] = args.reg_option
     config['force_die'] = args.force_die
-    config['memo'] = args.memo
+    config['suite'] = args.suite
+    config['passes'] = args.passes 
+    config['modules'] = args.modules
+    config['extra_flags'] = args.extra_flags
 
+    # Load from file is given
+    if args.config_file:
+      config_from_file = get_config_from_file(args.config_file)
+      if config_from_file is None:
+          print("Loading config file failed")
+          sys.exit(-1)
+      for key in keys:
+          if config[key] == None:
+              if key in config_from_file and config_from_file[key] != None:
+                config[key] = config_from_file[key]
+
+    # Fill in default values
+    for key in default_keys:
+      if config[key] == None:
+        config[key] = default_keys[key]
+
+    #for key in nondefault_keys:
+    #  if config[key] == None:
+    #    get_key_from_user()
+
+    with open(config['bmark_list'], 'r') as fd:
+        bmark_list = json.load(fd)
+    bmark_list = get_benchmark_list_from_suite(config['suite'], bmark_list)
+    config['bmark_list'] = bmark_list
 
     # Get CPF and Regression Git Hash
     if 'LIBERTY_LIBS_DIR' in os.environ and 'LIBERTY_SMTX_DIR' in os.environ:
@@ -442,45 +485,16 @@ def parse_args():
     dt = datetime.datetime.now()
     config['result_path'] = os.path.join(config['root_path'], "results", dt.strftime('%Y-%m-%d-%H-%M'))
 
+    if not os.path.exists(config['result_path']):
+        os.makedirs(config['result_path'])
+
     return config
 
 
-# TODO: not used
 def get_config_from_file(config_file):
 
     with open(config_file, 'r') as fd:
         config = json.load(fd)
-
-    # check all keys
-    necessary_keys = ['bmarks_root_path', 'job_num', 'test_times', 'bmark_list_file',
-                      'suite', 'reg_option', 'experiment_passes']
-
-    for key in necessary_keys:
-        if key not in config:
-            print("Key %s not in config, abort!" % key)
-            sys.exit(1)
-
-    if 'Compare' in config['experiment_passes']:
-        if 'compare_worker_num' not in config:
-            print("Key compare_worker_num not in config when doing Compare, abort!")
-            sys.exit(1)
-
-    if 'Multicore' in config['experiment_passes']:
-        if 'multicore_workers_list' not in config:
-            print("Key multicore_workers_list not in config when doing Multicore, abort!")
-            sys.exit(1)
-
-    # Get actual benchmarks
-    with open(config['bmark_list_file'], 'r') as fd:
-        bmark_list = json.load(fd)
-    bmark_list = get_benchmark_list_from_suite(config['suite'], bmark_list)
-
-    config["bmark_list"] = bmark_list
-
-    # Results directory
-    dt = datetime.datetime.now()
-    config['result_path'] = os.path.join(config['bmarks_root_path'], "results", dt.strftime('%Y-%m-%d-%H-%M'))
-    config['date'] = dt.strftime('%Y-%m-%d-%H-%M')
 
     return config
 
@@ -524,6 +538,7 @@ def preview_config(config):
     print("Running test on %s benchmarks %s :" % (colored(str(len(config['bmark_list'])), 'yellow'), colored(str(config['bmark_list']), 'yellow')))
 
     reg_option = config['reg_option']
+    prompt = "Regression option not between 0 and 4, please try again!"
     if reg_option == 0:
         prompt = "Will remove everything and start from the beginning"
     elif reg_option == 1:
@@ -541,19 +556,7 @@ def preview_config(config):
     print("Store results under directory: %s" % colored(config['result_path'], 'yellow'))
     print(colored("#### End of Configurations ####", 'green'))
 
-
 if __name__ == "__main__":
-    #passes = ["Edge", "Loop", "LAMP", "SpecPriv", "PDG"] # "Experiment"]
-    #passes = ["Edge", "Loop", "LAMP", "SpecPriv", "Experiment"]
-    #passes = ["Edge", "Loop", "LAMP", "SpecPriv", "Exp-3"]
-    #passes = ["Edge", "Loop", "SLAMP"] #"SLAMP", "Exp-slamp", "Exp-ignorefn"]
-    #passes = ["Profile-Seq"] #"SLAMP", "Exp-slamp", "Exp-ignorefn"]
-    #  passes = ["Msan", "Asan"]#, "Exp-slamp", "Exp-ignorefn"]
-    passes = ["SLAMP"]#, "Exp-slamp", "Exp-ignorefn"]
-    #  passes = ["Inline"]
-    # passes = ["Edge", "Loop", "LAMP", "SpecPriv", "Exp-3"]
-    # passes = ["Edge", "Loop", "LAMP", "SpecPriv", "Experiment", "RealSpeedup"]
-    # passes = ["Edge", "Loop", "LAMP", "SLAMP", "SpecPriv", "HeaderPhi", "Experiment"]
 
     config = parse_args()
     if not config:
@@ -584,29 +587,29 @@ if __name__ == "__main__":
     print("\n\n### Experiment Start ###")
     # Preprocesing
     # Create result directory
-    if not os.path.exists(config['result_path']):
-        os.makedirs(config['result_path'])
+    #if not os.path.exists(config['result_path']):
+    #    os.makedirs(config['result_path'])
 
     # Create a log with date + memo + configuration
-    log_path = config['result_path'] + ".log"
-    print("Creating log at %s" % log_path)
-    with open(log_path, "w") as fd:
-        json.dump(config, fd)
-    print("\n")
+    #log_path = config['result_path'] + ".log"
+    #print("Creating log at %s" % log_path)
+    #with open(log_path, "w") as fd:
+    #    json.dump(config, fd)
+    #print("\n")
 
     # Clean old artifacts
     clean_all_bmarks(config['root_path'], config['bmark_list'], config['reg_option'])
 
     # Finish till experiment
     status_list = Parallel(n_jobs=config['core_num'])(delayed(get_all_passes)(
-        config['root_path'], bmark, passes, config['result_path']) for bmark in config['bmark_list'])
+        config['root_path'], bmark, config['passes'], config['result_path'], config['modules'], config['extra_flags']) for bmark in config['bmark_list'])
     status = dict(ChainMap(*status_list))
 
     # If any pass failed, die here
     die = False
     if config['force_die']:
         for bmark in config['bmark_list']:
-            for p in passes:
+            for p in config['passes']:
                 if not status[bmark][p]:
                     die = True
                     print(colored("%s failed on %s" % (bmark, p), 'red'))
@@ -614,7 +617,7 @@ if __name__ == "__main__":
     if die:
         sys.exit(1)
 
-    if "RealSpeedup" in passes:
+    if "RealSpeedup" in config['passes']:
         # Get Speedup in sequential
         for bmark in config['bmark_list']:
             real_speedup = get_real_speedup(config['root_path'], bmark, config['reg_option'], config['test_times'])
@@ -638,7 +641,11 @@ if __name__ == "__main__":
     with open("status.json", "w") as fd:
         json.dump(status, fd)
 
-    reVis = ReportVisualizer(bmarks=config['bmark_list'], passes=passes, status=status, path=config['result_path'])
+    reVis = ReportVisualizer(bmarks=config['bmark_list'], passes=config['passes'], status=status, path=config['result_path'])
     reVis.dumpCSV()
     reVis.dumpDepCoverageTable()
+
+    result_config_json = os.path.join(config['result_path'], "config.json")
+    with open(result_config_json, 'w') as outfile:
+        json.dump(config, outfile, indent=4)
 
