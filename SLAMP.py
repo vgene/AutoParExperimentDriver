@@ -9,23 +9,22 @@ import time
 import re
 
 def set_SLAMP_environ(modules=None, extra_flags=None):
-    module_list = ["DISTANCE", "CONSTANT_VALUE",
-                                 "CONSTANT_ADDRESS", "LINEAR_VALUE", "LINEAR_ADDRESS", "TRACE"]
-    extra_flag_list = ["slamp-target-fn=",
-                                         "slamp-target-loop=", "slamp-target-inst="]
+    module_list = ["DISTANCE", "CONSTANT_VALUE", "NO_DEPENDENCE",
+            "CONSTANT_ADDRESS", "LINEAR_VALUE", "LINEAR_ADDRESS", "TRACE"]
+    #  extra_flag_list = ["slamp-target-fn=",
+    #                                       "slamp-target-loop=", "slamp-target-inst="]
 
     SLAMP_env = os.environ.copy()
-    for module in module_list:
-        if module in modules:
-            SLAMP_env[module+"_MODULE"] = "1"
-        else:
-            SLAMP_env[module+"_MODULE"] = "0"
+    if modules:
+        for module in module_list:
+            if module in modules:
+                SLAMP_env[module+"_MODULE"] = "1"
+            else:
+                SLAMP_env[module+"_MODULE"] = "0"
 
     extra_flag_env = ""
-    for flag in extra_flag_list:
-        for eflag in extra_flags:
-            if(re.match(flag, eflag)):
-                extra_flag_env += "-"+eflag+" "
+    if extra_flags:
+        extra_flag_env = " ".join(extra_flags)
 
     SLAMP_env["EXTRA_FLAGS"] = extra_flag_env
     return SLAMP_env
@@ -64,9 +63,9 @@ def parse_SLAMP_output(root_path, bmark, result_path, modules):
         is_distance = True
 
     for outfile in outfiles:
-        shutil.move(os.path.join(source, outfile), os.path.join(result_path, outfile))
+        shutil.copy(os.path.join(source, outfile), os.path.join(result_path, bmark + "." + outfile))
 
-    os.chdir(result_path)
+    os.chdir(source)
 
     with open("benchmark.result.slamp.profile") as fr:
         depinfo = {}

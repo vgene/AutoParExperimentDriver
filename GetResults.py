@@ -306,6 +306,10 @@ def get_real_speedup(root_path, bmark, reg_option, times=3, default_num_worker=2
 
 
 def get_all_passes(root_path, bmark, passes, result_path, modules=None, extra_flags=None):
+    if modules == None:
+        modules = []
+    if passes == None:
+        passes = []
     status = {}
     if "Inline" in passes:
       status["Inline"] = get_one_prof(root_path, bmark, 'Inline', "benchmark.inlined.o3.out")
