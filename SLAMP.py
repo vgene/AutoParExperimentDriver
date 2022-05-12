@@ -53,7 +53,7 @@ def run_SLAMP(root_path, bmark, modules=None, extra_flags=None):
 
 def parse_SLAMP_output(root_path, bmark, result_path, modules):
     source = os.path.join(root_path, bmark, "src")
-    outfiles = ["benchmark.result.slamp.profile", "slamp_access_module.json"]
+    outfiles = ["benchmark.result.slamp.profile", "slamp_access_module.json", "rabbit6"]
     is_trace = False
     is_distance = False
     if("TRACE" in modules):
@@ -63,7 +63,9 @@ def parse_SLAMP_output(root_path, bmark, result_path, modules):
         is_distance = True
 
     for outfile in outfiles:
-        shutil.copy(os.path.join(source, outfile), os.path.join(result_path, bmark + "." + outfile))
+        # if exist
+        if os.path.exists(os.path.join(source, outfile)):
+            shutil.copy(os.path.join(source, outfile), os.path.join(result_path, bmark + "." + outfile))
 
     os.chdir(source)
 
