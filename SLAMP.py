@@ -69,31 +69,33 @@ def parse_SLAMP_output(root_path, bmark, result_path, modules):
 
     os.chdir(source)
 
-    with open("benchmark.result.slamp.profile") as fr:
-        depinfo = {}
-        keys = ["loopID", "src", "dst", "baredst", "iscross", "count"]
-        if(is_distance):
-            keys+=["distanceInfo"]
-        count = 0
-        for line in fr:
-            temp = {}
-            if(not re.search(r'\S+ 0 0 0 0', line)):
-                instdep = list(line.split(None, 6))
-                for i in range (6):
-                    temp[keys[i]]=instdep[i]
-                if(is_distance):
-                    distancelist = list(instdep[6].strip("[],i \n").split(", "))
-                    distancedic = {}
-                    for i in range (len(distancelist)):
-                        distance = list(distancelist[i].strip("()").split(None, 2))
-                        distancedic[distance[0]] = distance[1]
-                    temp[keys[6]]=distancedic
-                depinfo[str(count)]=temp
-                count += 1
+    # if exists
+    if os.path.exists("benchmark.result.slamp.profile"):
+        with open("benchmark.result.slamp.profile") as fr:
+            depinfo = {}
+            keys = ["loopID", "src", "dst", "baredst", "iscross", "count"]
+            if(is_distance):
+                keys+=["distanceInfo"]
+            count = 0
+            for line in fr:
+                temp = {}
+                if(not re.search(r'\S+ 0 0 0 0', line)):
+                    instdep = list(line.split(None, 6))
+                    for i in range (6):
+                        temp[keys[i]]=instdep[i]
+                    if(is_distance):
+                        distancelist = list(instdep[6].strip("[],i \n").split(", "))
+                        distancedic = {}
+                        for i in range (len(distancelist)):
+                            distance = list(distancelist[i].strip("()").split(None, 2))
+                            distancedic[distance[0]] = distance[1]
+                        temp[keys[6]]=distancedic
+                    depinfo[str(count)]=temp
+                    count += 1
 
-        fw = open("loopDepInfo.json", "w")
-        json.dump(depinfo, fw, indent=4)
-        fw.close()
+            fw = open("loopDepInfo.json", "w")
+            json.dump(depinfo, fw, indent=4)
+            fw.close()
 
 
     #parse trace.txt
