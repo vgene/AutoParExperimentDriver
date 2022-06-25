@@ -418,7 +418,7 @@ def parse_args():
     parser.add_argument("-s", "--suite", type=str, choices=[
         'All', 'reg_fast', 'reg_all', 'Spec', 'SpecFP', 'SpecInt',
         'PolyBench', 'PARSEC', 'MediaBench', 'Toys',
-        'MiBench', 'Trimaran', 'Utilities', 'MicroBench'],
+        'MiBench', 'Trimaran', 'Utilities', 'MicroBench', 'Spec2006', 'Spec2017'],
         help="Choose specific test suite")
 
     parser.add_argument("-c", "--config_file", type=str,
