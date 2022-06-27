@@ -79,6 +79,8 @@ def get_one_prof(root_path, bmark, profile_name, profile_recipe):
     else:
         elapsed = time.time() - start_time
         printAndFlush(colored("%s succeeded for %s, took %.4fs" % (profile_name, bmark, elapsed), 'green'))
+        # if benchmark.$profile.time exists, copy it to result directory and change "benchmark" to the actual benchmark name
+        # move profile_recipe.replace(".out", ".time") to results_path
         return True
 
 
