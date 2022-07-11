@@ -8,7 +8,7 @@ import datetime
 import time
 import re
 
-def set_SLAMP_environ(modules=None, extra_flags=None):
+def set_SLAMP_environ(modules=None, extra_flags=None, parallel_workers=1):
     module_list = ["DISTANCE", "CONSTANT_VALUE", "NO_DEPENDENCE",
             "CONSTANT_ADDRESS", "LINEAR_VALUE", "LINEAR_ADDRESS", "TRACE"]
     #  extra_flag_list = ["slamp-target-fn=",
@@ -22,6 +22,9 @@ def set_SLAMP_environ(modules=None, extra_flags=None):
             else:
                 SLAMP_env[module+"_MODULE"] = "0"
 
+    if parallel_workers > 1:
+        SLAMP_env["LOCALWRITE_THREADS"] = str(parallel_workers)
+
     extra_flag_env = ""
     if extra_flags:
         extra_flag_env = " ".join(extra_flags)
@@ -30,12 +33,12 @@ def set_SLAMP_environ(modules=None, extra_flags=None):
     return SLAMP_env
 
 
-def run_SLAMP(root_path, bmark, modules=None, extra_flags=None):
+def run_SLAMP(root_path, bmark, modules=None, extra_flags=None, parallel_workers=1):
     print("Generating %s on %s " % ("SLAMP", bmark))
 
     os.chdir(os.path.join(root_path, bmark, "src"))
 
-    SLAMP_env = set_SLAMP_environ(modules, extra_flags)
+    SLAMP_env = set_SLAMP_environ(modules, extra_flags, parallel_workers)
     start_time = time.time()
     with open("SLAMP.log", "w") as fd:
         make_process = subprocess.Popen(["make", "benchmark.result.slamp.profile"],

@@ -15,7 +15,7 @@ import sys
 import os
 import subprocess
 import shutil
-from joblib import Parallel, delayed
+from joblib import Parallel, delayed, parallel
 from collections import ChainMap
 from termcolor import colored
 import datetime
@@ -307,7 +307,7 @@ def get_real_speedup(root_path, bmark, reg_option, times=3, default_num_worker=2
     return real_speedup
 
 
-def get_all_passes(root_path, bmark, passes, result_path, modules=None, extra_flags=None):
+def get_all_passes(root_path, bmark, passes, result_path, modules=None, extra_flags=None, slamp_parallel_workers=1):
     if modules == None:
         modules = []
     if passes == None:
@@ -322,7 +322,7 @@ def get_all_passes(root_path, bmark, passes, result_path, modules=None, extra_fl
     if "LAMP" in passes:
         status["LAMP"] = get_one_prof(root_path, bmark, 'LAMP', "benchmark.lamp.out")
     if "SLAMP" in passes:
-        status["SLAMP"] = SLAMP.run_SLAMP(root_path, bmark, modules, extra_flags)
+        status["SLAMP"] = SLAMP.run_SLAMP(root_path, bmark, modules, extra_flags, slamp_parallel_workers)
         SLAMP.parse_SLAMP_output(root_path, bmark, result_path, modules)
     if "Profile-Seq" in passes:
         status["Profile-Seq"] = get_one_prof(root_path, bmark, 'Profile-Seq', "profile-seq.time")
@@ -423,6 +423,8 @@ def parse_args():
         'MiBench', 'Trimaran', 'Utilities', 'MicroBench', 'Spec2006', 'Spec2017'],
         help="Choose specific test suite")
 
+    parser.add_argument("--slamp-workers", type=int, default=1, help="Number of workers for SLAMP")
+
     parser.add_argument("-c", "--config_file", type=str,
                         help="config file")
 
@@ -440,6 +442,7 @@ def parse_args():
     config['passes'] = args.passes 
     config['modules'] = args.modules
     config['extra_flags'] = args.extra_flags
+    config['slamp_parallel_workers'] = args.slamp_workers
 
     # Load from file is given
     if args.config_file:
@@ -461,10 +464,12 @@ def parse_args():
     #  if config[key] == None:
     #    get_key_from_user()
 
-    with open(config['bmark_list'], 'r') as fd:
-        bmark_list = json.load(fd)
-    bmark_list = get_benchmark_list_from_suite(config['suite'], bmark_list)
-    config['bmark_list'] = bmark_list
+    # otherwise it's already a list
+    if not args.config_file and type(config['bmark_list']) is str:
+        with open(config['bmark_list'], 'r') as fd:
+            bmark_list = json.load(fd)
+        bmark_list = get_benchmark_list_from_suite(config['suite'], bmark_list)
+        config['bmark_list'] = bmark_list
 
     # Get CPF and Regression Git Hash
     if 'LIBERTY_LIBS_DIR' in os.environ and 'LIBERTY_SMTX_DIR' in os.environ:
@@ -590,6 +595,11 @@ if __name__ == "__main__":
                 print("Let's start over, good luck!")
                 sys.exit(1)
 
+
+    result_config_json = os.path.join(config['result_path'], "config.json")
+    with open(result_config_json, 'w') as outfile:
+        json.dump(config, outfile, indent=4)
+
     print("\n\n### Experiment Start ###")
     # Preprocesing
     # Create result directory
@@ -608,7 +618,7 @@ if __name__ == "__main__":
 
     # Finish till experiment
     status_list = Parallel(n_jobs=config['core_num'])(delayed(get_all_passes)(
-        config['root_path'], bmark, config['passes'], config['result_path'], config['modules'], config['extra_flags']) for bmark in config['bmark_list'])
+        config['root_path'], bmark, config['passes'], config['result_path'], config['modules'], config['extra_flags'], config['slamp_parallel_workers']) for bmark in config['bmark_list'])
     status = dict(ChainMap(*status_list))
 
     # If any pass failed, die here
@@ -650,8 +660,4 @@ if __name__ == "__main__":
     reVis = ReportVisualizer(bmarks=config['bmark_list'], passes=config['passes'], status=status, path=config['result_path'])
     reVis.dumpCSV()
     reVis.dumpDepCoverageTable()
-
-    result_config_json = os.path.join(config['result_path'], "config.json")
-    with open(result_config_json, 'w') as outfile:
-        json.dump(config, outfile, indent=4)
 
