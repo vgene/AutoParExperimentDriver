@@ -407,8 +407,7 @@ def parse_args():
     #                      default=4, help="Core number")
     #  parser.add_argument("-m", "--memo", type=str,
     #                      default="", help="A short description of the run")
-    parser.add_argument("-f", "--force-die", type=bool, #action='store_true',
-                        help="Regression option (0-5), will bypass interaction")
+    parser.add_argument("-f", "--force-die", type=bool, action='store_true', help="End the run if any test fails")
     parser.add_argument("-n", "--core-num", type=int, #default=4, 
                         help="Core number")
     parser.add_argument("-t", "--test-times", type=int,
