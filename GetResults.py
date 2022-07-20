@@ -367,7 +367,7 @@ def get_all_passes(root_path, bmark, passes, result_path, modules=None, extra_fl
         # else:
             # status["Experiment-all-spec"] = None
     if "No-Spec" in passes:
-        status["Experiment-no-spec"] = get_exp_result(root_path, bmark, result_path, "no-spec.dump")
+        status["No-Spec"] = get_exp_result(root_path, bmark, result_path, "no-spec.dump")
     if "PDG" in passes:
         status["PDG"] = get_pdg(root_path, bmark, result_path)
 
