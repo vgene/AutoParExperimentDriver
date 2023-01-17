@@ -96,7 +96,7 @@ def parseExp(lines, bmark):
 
     # TODO: extension to more techniques (assuming DSWP now)
     loop_speedup_re = re.compile(
-        r' - .+%.(.+).(DSWP\[.*\]).\(Loop speedup:.([0-9\.]+)x')
+        r' - .+%.(.+).(DSWP\[.*\]).\(Loop speedup:.([0-9\.]+)x.*')
 
     for line in lines[anchor_loop_speedup + 1:]:
         loop_speedup_re_parsed = loop_speedup_re.findall(line)
@@ -110,8 +110,18 @@ def parseExp(lines, bmark):
                     "loop_stage": loop_stage,
                     "loop_speedup": float(loop_speedup)
                 })
+
+                if "(SLAMP)" in line:
+                    slamp = True
+                else:
+                    slamp = False
+
+                loops[loop_name.strip()].update({
+                    "slamp": slamp
+                })
             except re.error:
                 print(loop_speedup_re_parsed)
+
         else:
             break
 

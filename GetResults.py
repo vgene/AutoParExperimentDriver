@@ -323,7 +323,7 @@ def get_all_passes(root_path, bmark, passes, result_path, modules=None, extra_fl
         status["LAMP"] = get_one_prof(root_path, bmark, 'LAMP', "benchmark.lamp.out")
     if "SLAMP" in passes:
         status["SLAMP"] = SLAMP.run_SLAMP(root_path, bmark, modules, extra_flags, slamp_parallel_workers)
-        SLAMP.parse_SLAMP_output(root_path, bmark, result_path, modules)
+        #  SLAMP.parse_SLAMP_output(root_path, bmark, result_path, modules)
     if "Profile-Seq" in passes:
         status["Profile-Seq"] = get_one_prof(root_path, bmark, 'Profile-Seq', "profile-seq.time")
     if "Asan" in passes:
@@ -339,10 +339,11 @@ def get_all_passes(root_path, bmark, passes, result_path, modules=None, extra_fl
     if "Experiment" in passes:
         status["Experiment"] = get_exp_result(root_path, bmark, result_path)
     if "Exp-slamp" in passes:
-        if 'Edge' in status and status['Edge'] and "SLAMP" in status and status['SLAMP']:
-            status["Exp-slamp"] = get_exp_result(root_path, bmark, result_path, "slamp.dump")
-        else:
-            status["Exp-slamp"] = None
+        status["Exp-slamp"] = get_exp_result(root_path, bmark, result_path, "slamp.dump")
+        #  if 'Edge' in status and status['Edge'] and "SLAMP" in status and status['SLAMP']:
+        #      status["Exp-slamp"] = get_exp_result(root_path, bmark, result_path, "slamp.dump")
+        #  else:
+        #      status["Exp-slamp"] = None
     if "Exp-ignorefn" in passes:
         if 'Edge' in status and status['Edge']:
             status["Exp-ignorefn"] = get_exp_result(root_path, bmark, result_path, "ignorefn.dump")
