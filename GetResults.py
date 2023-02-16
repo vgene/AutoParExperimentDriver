@@ -153,11 +153,9 @@ def get_exp_result(root_path, bmark, result_path, exp_name="benchmark.collaborat
         return None
     else:
         elapsed = time.time() - start_time
-        with open(exp_name, 'r') as fd:
-            lines = fd.readlines()
 
         # Parse experiment results
-        parsed_result = parseExp(lines, bmark)
+        parsed_result = parseExp(exp_name, bmark, "loop_stats.json")
 
         # Create a backup
         shutil.copy(exp_name, os.path.join(result_path, bmark + "." + exp_name))

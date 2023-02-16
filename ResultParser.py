@@ -7,11 +7,28 @@
 # Parse result dump
 # Please follow instructions in README.md
 
+import os
 import re
-
+import json
 
 # Parse result
-def parseExp(lines, bmark):
+def parseExp(dump_fname, bmark, loop_stats_fname=None):
+    # Read dump file
+    lines = []
+    with open(dump_fname, 'r') as f:
+        lines = f.readlines()
+
+    loop_stats = []
+    if loop_stats_fname is not None:
+        if not os.path.isfile(loop_stats_fname):
+            print("Warning: %s Unexpected loop_stats.json; not a file" % bmark)
+        else:
+            with open(loop_stats_fname, 'r') as f:
+                loop_stats = json.load(f)
+                # loop_stats should be a list
+                if not isinstance(loop_stats, list):
+                    print("Warning: %s Unexpected loop_stats.json; not a list" % bmark)
+                    loop_stats = []
 
     if lines is None or len(lines) == 0:
         print("Warning: %s Unexpected dump; empty" % bmark)
@@ -229,13 +246,18 @@ def parseExp(lines, bmark):
 
     loop_anchor_list = []
     loop_name_list = []
-    loop_name_from_weight_re = re.compile(
-        r'Compute weight for loop (.+)\.\.\.')
+    loop_name_from_parallelizing_re = re.compile(
+        r'Parallelizing loop: (.+)\n')
+    loop_scope_start = "Parallelizing loop:"
+
     for idx, line in enumerate(lines):
-        if line.startswith("Compute weight for loop"):
-            loop_name_from_weight_parsed = loop_name_from_weight_re.findall(line)
-            if loop_name_from_weight_parsed:
-                loop_name = loop_name_from_weight_parsed[0]
+        if line.startswith(loop_scope_start):
+            loop_name_from_parallelizing_parsed = loop_name_from_parallelizing_re.findall(line)
+            if loop_name_from_parallelizing_parsed:
+                loop_name = loop_name_from_parallelizing_parsed[0]
+                # if name only has ":" not "::", swap ":" with " :: "
+                if loop_name.count(":") == 1:
+                    loop_name = loop_name.replace(":", " :: ")
                 if loop_name.strip() not in loops:
                     print("Warning: %s Unexpected dump; loop_name doesn't match" % bmark)
                     return None
@@ -300,9 +322,7 @@ def parseExp(lines, bmark):
                     print(e)
                     print("Warning: cannot convert sequential scc to float")
 
-            # elif line.startswith("Selected Remedies"):
-            #     remedies_start_offset = idx + 1
-            elif line.startswith("Compute weight for loop"):
+            elif line.startswith(loop_scope_start):
                 break
 
         chosen_type_count = {
@@ -329,110 +349,6 @@ def parseExp(lines, bmark):
             "war": {}
         }
 
-        # if remedies_start_offset == -1:
-        #     continue
-
-        # remedies_start_anchor = anchor + remedies_start_offset
-
-        chosen_re = re.compile(
-            r'\((.+?)\) chosen.+\((.+?)\)')
-        avail_re = re.compile(
-            r'Remedies (.+) can address.+\((.+)\).+')
-        name_re = re.compile(
-            r'\((.+?)\)')
-
-        type_state = None
-        lc_ii_state = None
-        # We don't care any IR Dep!
-        for line in lines[anchor + 1:]:
-
-            if line.startswith("Compute weight for loop"):
-                break
-            chosen_parsed = chosen_re.findall(line)
-            avail_parsed = avail_re.findall(line)
-            if chosen_parsed:
-                remediator_name, dep_info = chosen_parsed[0]
-                remediator_name = remediator_name.strip()
-            elif avail_parsed:
-                remediator_names, dep_info = avail_parsed[0]
-            else:
-                # avail or chosen remedy not found
-                continue
-
-            # determine type
-            if "Reg" in dep_info:
-                type_state = "reg"
-            elif "WAW" in dep_info:
-                type_state = "waw"
-            elif "WAR" in dep_info:
-                type_state = "war"
-            elif "RAW" in dep_info:
-                type_state = "raw"
-            elif "Control" in dep_info:
-                type_state = "ctrl"
-            else:
-                print("Warning: Unexpected dump for %s, no type in dep info!" % bmark)
-                return None
-
-            # determine lc or ii
-            if "LC" in dep_info:
-                lc_ii_state = "lc"
-            elif "II" in dep_info:
-                lc_ii_state = "ii"
-            else:
-                print("Warning: Unexpected dump for %s, no LC/II in dep info!" % bmark)
-                return None
-
-            # skip if II
-            if lc_ii_state == "ii":
-                continue
-
-            if chosen_parsed:
-                # add to both dicts
-                chosen_type_count[type_state] += 1
-                if remediator_name in chosen_dict[type_state]:
-                    chosen_dict[type_state][remediator_name] += 1
-                else:
-                    chosen_dict[type_state][remediator_name] = 1
-
-                # if remediator_name in avail_dict[type_state]:
-                #     avail_dict[type_state][remediator_name] += 1
-                # else:
-                #     avail_dict[type_state][remediator_name] = 1
-
-            elif avail_parsed:
-                name_parsed = name_re.findall(remediator_names)
-                if name_parsed:
-                    for remediator_name in name_parsed:
-                        remediator_name = remediator_name.strip()
-                        if remediator_name in avail_dict[type_state]:
-                            avail_dict[type_state][remediator_name] += 1
-                        else:
-                            avail_dict[type_state][remediator_name] = 1
-
-            # # not used!
-            # elif line.startswith("Alternative remedies for the same criticism"):
-            #     if not type_state or not lc_ii_state:
-            #         print("Warning: Alternative remedies appear without context in %s" % bmark)
-            #         return None
-            #     if lc_ii_state == "ii":
-            #         continue
-            #     name_parsed = name_re.findall(line)
-            #     if name_parsed:
-            #         for remediator_name in name_parsed:
-            #             remediator_name = remediator_name.strip()
-            #             if remediator_name in avail_dict[type_state]:
-            #                 avail_dict[type_state][remediator_name] += 1
-            #             else:
-            #                 avail_dict[type_state][remediator_name] = 1
-
-        # # Check memory deps add up correctly, wont work if not DOALL loop!
-        # if num_raw_lcdep != chosen_type_count['raw'] or num_war_lcdep != chosen_type_count['war'] or num_waw_lcdep != chosen_type_count['waw']:
-        #     print("Warning: Unexpected dump, not all memory deps are covered!")
-
-        avail_dict['ctrl']['replicable-stage-remedy'] = chosen_dict['ctrl']['replicable-stage-remedy'] = num_control_lcdep - chosen_type_count['ctrl']
-        avail_dict['reg']['replicable-stage-remedy'] = chosen_dict['reg']['replicable-stage-remedy'] = num_reg_lcdep - chosen_type_count['reg']
-
         final_dict = {
             "num_queries": num_queries,
             "num_raw_lcdep": num_raw_lcdep,
@@ -448,6 +364,14 @@ def parseExp(lines, bmark):
         }
         loops[loop_name]["dependence_info"] = final_dict
 
+    # merge loop_stats with loop
+    for loop_stat in loop_stats:
+        loop_name = loop_stat["function"] + " :: " + loop_stat["loop"]
+        if loop_name not in loops:
+            print("Warning: %s Unexpected dump; loop_name doesn't match" % bmark)
+        else:
+            loops[loop_name]["blocking_deps"] = loop_stat["blocking-dependences"]
+
     return {"speedup": speedup, "worker_cnt": worker_cnt, "total_coverage": total_coverage,
             "loops": loops, "compatible_map": compatible_pairs, "loop_order": loop_order}
 
@@ -461,8 +385,8 @@ if __name__ == '__main__':
     import sys
     import os
     from pprint import pprint
-    if len(sys.argv) != 2:
-        print("Use python ResultParser.py benchmark.*.dump for testing")
+    if len(sys.argv) != 2 and len(sys.argv) != 3:
+        print("Use python ResultParser.py *.dump [loop_stats.json] for testing")
         exit()
 
     filename = sys.argv[1]
@@ -470,7 +394,12 @@ if __name__ == '__main__':
         print("Dump file doesn't exist")
         exit()
 
-    with open(filename, 'r') as fd:
-        lines = fd.readlines()
+    # if there is another argument, it is the loop_stats name
+    loop_stats_filename = None
+    if len(sys.argv) == 3:
+        loop_stats_filename = sys.argv[2]
+        if not os.path.isfile(loop_stats_filename):
+            print("Loop stats file doesn't exist")
+            exit()
 
-    pprint(parseExp(lines, "test"))
+    print(parseExp(filename, "test", loop_stats_filename))
