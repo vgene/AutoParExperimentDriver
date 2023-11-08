@@ -63,6 +63,21 @@ def clean_all_bmarks(root_path, bmark_list, reg_option):
     printAndFlush("Finish cleaning")
     return 0
 
+def compile_slamp(root_path, bmark):
+
+    os.chdir(os.path.join(root_path, bmark, "src"))
+    for module in ["dep", "lv", "pt", "ol", "wp-dep", "dep-context"]:
+        printAndFlush(f"Compiling {bmark} for {module}")
+        # make benchmark.named.slamp.exe.{module}
+        make_process = subprocess.Popen(
+                ["make", "benchmark.named.slamp.exe.%s" % module], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT
+                )
+        if make_process.wait() != 0:
+            printAndFlush(colored(f"Compile failed for {bmark} for {module}", "red"))
+        else:
+            printAndFlush(colored(f"Compile succeeded for {bmark} for {module}", "green"))
+    return True
+
 
 def get_one_prof(root_path, bmark, profile_name, profile_recipe):
     printAndFlush("Generating %s on %s " % (profile_name, bmark))
@@ -187,11 +202,15 @@ def get_exp_result(
         return parsed_result
 
 
-def get_seq_time(root_path: str, bmark: str, times: int):
+def get_seq_time(root_path: str, bmark: str, times: int, use_profile=False):
     printAndFlush("Try to get sequential execution time (repeated %d times)" % times)
     os.chdir(os.path.join(root_path, bmark, "src"))
-    exp_name = "reg_seq"
-    seq_time_name = "seq.time"
+    if use_profile:
+        exp_name = "reg_seq_profile"
+        seq_time_name = "profile-seq.time"
+    else:
+        exp_name = "reg_seq"
+        seq_time_name = "seq.time"
 
     time_list = []
     for run_time in range(times):
@@ -393,12 +412,60 @@ def get_all_passes(
         status["Loop"] = get_one_prof(
             root_path, bmark, "Loop Profile", "benchmark.loopProf.out"
         )
+    if "Seq" in passes:
+        seq_time_list, seq_time = get_seq_time(root_path, bmark, times=3, use_profile=True)
+        status["Seq"] = (seq_time_list, seq_time)
+
     if "LAMP" in passes:
-        status["LAMP"] = get_one_prof(root_path, bmark, "LAMP", "benchmark.lamp.out")
+        lamp_times = []
+        for i in range(5):  # run the command 5 times
+            is_success = get_one_prof(root_path, bmark, "LAMP", "benchmark.lamp.out")
+
+            if not is_success:
+                break
+
+            time_file = os.path.join(root_path, bmark, "src", "benchmark.lamp.time")
+            with open(time_file, "r") as f:
+                run_time = float(f.read().strip())
+                lamp_times.append(run_time)
+
+            # remove the file `benchmark.result.slamp.profile`
+            os.remove(
+                os.path.join(root_path, bmark, "src", "benchmark.lamp.out")
+            )
+
+        status["LAMP"] = lamp_times
+
+        #  status["LAMP"] = get_one_prof(root_path, bmark, "LAMP", "benchmark.lamp.out")
     if "SLAMP" in passes:
-        status["SLAMP"] = SLAMP.run_SLAMP(
-            root_path, bmark, modules, extra_flags, slamp_parallel_workers
-        )
+        # compile_slamp(root_path, bmark)
+        # FIXME: a hack to do error bar evaluation
+        slamp_times = []
+        for i in range(2):  # run the command 5 times
+            # remove the file `benchmark.result.slamp.profile` if exists
+            profile = os.path.join(root_path, bmark, "src", "benchmark.result.slamp.profile.wp-dep")
+            if os.path.exists(profile):
+                os.remove(profile)
+
+            is_success = get_one_prof(root_path, bmark, "SLAMP", "benchmark.result.slamp.profile.wp-dep")
+
+            # is_success = SLAMP.run_SLAMP(
+            #     root_path, bmark, modules, extra_flags, slamp_parallel_workers
+            # )
+
+            if not is_success:
+                break
+
+            time_file = os.path.join(root_path, bmark, "src", "slamp.time")
+            with open(time_file, "r") as f:
+                run_time = float(f.read().strip())
+                slamp_times.append(run_time)
+
+        status["SLAMP"] = slamp_times
+
+        # status["SLAMP"] = SLAMP.run_SLAMP(
+        #     root_path, bmark, modules, extra_flags, slamp_parallel_workers
+        # )
         #  SLAMP.parse_SLAMP_output(root_path, bmark, result_path, modules)
     if "Profile-Seq" in passes:
         status["Profile-Seq"] = get_one_prof(
@@ -413,9 +480,27 @@ def get_all_passes(
             root_path, bmark, "measure", "benchmark.slamp.measure.txt"
         )
     if "SpecPriv" in passes:
-        status["SpecPriv"] = get_one_prof(
-            root_path, bmark, "SpecPriv Profile", "benchmark.specpriv-profile.out"
-        )
+        profile_times = []
+        for i in range(1):  # run the command 5 times
+            is_success = get_one_prof(root_path, bmark, "specpriv-profile", "benchmark.specpriv-profile.out")
+
+            if not is_success:
+                break
+
+            time_file = os.path.join(root_path, bmark, "src", "benchmark.specpriv-profile.time")
+            with open(time_file, "r") as f:
+                run_time = float(f.read().strip())
+                profile_times.append(run_time)
+
+            # remove the file `benchmark.result.sspecpriv-profile.profile`
+            os.remove(
+                os.path.join(root_path, bmark, "src", "benchmark.specpriv-profile.out")
+            )
+
+        status["SpecPriv"] = profile_times
+        #  status["SpecPriv"] = get_one_prof(
+            #  root_path, bmark, "SpecPriv Profile", "benchmark.specpriv-profile.out"
+        #  )
     if "HeaderPhi" in passes:
         status["HeaderPhi"] = get_one_prof(
             root_path, bmark, "HeaderPhi Profile", "benchmark.headerphi_prof.out"
